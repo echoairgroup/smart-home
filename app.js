@@ -11,7 +11,7 @@ if (hasBackend) {
     console.error("Haven backend import:", error);
   }
 }
-const state = {user:null,household:null,role:null,rooms:[],devices:[],automations:[],events:[],members:[],presence:[],realtimeChannel:null,realtimeHouseholdId:null,refreshTimer:null,view:"overview",authMode:"login",inviteToken:"",installPrompt:null,weather:null};
+const state = {user:null,household:null,role:null,rooms:[],devices:[],automations:[],events:[],members:[],presence:[],realtimeChannel:null,realtimeHouseholdId:null,refreshTimer:null,pendingInviteRunning:false,view:"overview",authMode:"login",inviteToken:"",installPrompt:null,weather:null};
 const $ = (selector,root=document) => root.querySelector(selector);
 const $$ = selector => Array.from(document.querySelectorAll(selector));
 const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -156,12 +156,29 @@ async function setPresence(value){
   toast(value==="home"?"Je status staat op thuis.":"Je status staat op afwezig.");
   await loadHouseholdData();
 }
+async function acceptPendingInvite(){
+  const token=sessionStorage.getItem("haven_pending_invite");
+  if(!token || !supabase || !state.user || state.pendingInviteRunning) return false;
+  state.pendingInviteRunning=true;
+  try{
+    const {error}=await supabase.rpc("accept_household_invite",{p_token:token});
+    if(error){sessionStorage.removeItem("haven_pending_invite");toast("De bewaarde gezinsuitnodiging kon niet worden gebruikt: "+error.message);return false;}
+    sessionStorage.removeItem("haven_pending_invite");
+    toast("Je bent aan het gezin toegevoegd.");
+    return true;
+  }finally{state.pendingInviteRunning=false;}
+}
 async function refreshSession(){
   if(!supabase){setConnection(false,backendImportError?"Backend niet bereikbaar":"Niet verbonden",backendImportError?"Supabase client laden mislukt":"Supabase nog instellen");render();return;}
   const {data,error}=await supabase.auth.getSession();if(error)toast("Sessie controleren is niet gelukt.");
   state.user=data?.session?.user||null;
-  if(state.user){setConnection(true,"Ingelogd","Cloud verbonden");await loadHousehold();}
-  else{state.household=null;state.role=null;state.rooms=[];state.devices=[];state.automations=[];state.events=[];state.members=[];state.presence=[];setConnection(false,"Niet ingelogd","Meld je aan om te beginnen");render();}
+  if(state.user){setConnection(true,"Ingelogd","Cloud verbonden");await acceptPendingInvite();await loadHousehold();}
+  else{
+    if(state.realtimeChannel)supabase.removeChannel(state.realtimeChannel);
+    state.realtimeChannel=null;state.realtimeHouseholdId=null;
+    state.household=null;state.role=null;state.rooms=[];state.devices=[];state.automations=[];state.events=[];state.members=[];state.presence=[];
+    setConnection(false,"Niet ingelogd","Meld je aan om te beginnen");render();
+  }
 }
 async function loadWeather(){
   const url="https://api.open-meteo.com/v1/forecast?latitude=52.43661&longitude=6.23282&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FAmsterdam&forecast_days=1";
@@ -288,4 +305,4 @@ window.addEventListener("hashchange",()=>{const next=location.hash.slice(1);if([
 if("serviceWorker" in navigator&&location.protocol!=="file:")window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(error=>console.warn("Service worker:",error)));
 updateDate();const hash=location.hash.slice(1);if(["overview","rooms","devices","automations","energy","activity","family","settings"].includes(hash))state.view=hash;
 render();loadWeather();refreshSession();setInterval(loadWeather,30*60*1000);
-if(supabase)supabase.auth.onAuthStateChange((_event,session)=>{const next=session?.user||null;if(next?.id!==state.user?.id){state.user=next;if(next)loadHousehold().catch(error=>toast(error.message));else{if(state.realtimeChannel)supabase.removeChannel(state.realtimeChannel);state.realtimeChannel=null;state.realtimeHouseholdId=null;state.household=null;state.role=null;state.rooms=[];state.devices=[];state.automations=[];state.events=[];state.members=[];state.presence=[];render();}}});
+if(supabase)supabase.auth.onAuthStateChange((_event,session)=>{const next=session?.user||null;if(next?.id!==state.user?.id){state.user=next;queueMicrotask(()=>refreshSession().catch(error=>toast(error.message)));}});
