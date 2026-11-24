@@ -152,7 +152,6 @@ async function setPresence(value){
     household_id:state.household.id,user_id:state.user.id,presence:value,updated_at:new Date().toISOString()
   },{onConflict:"household_id,user_id"});
   if(error){toast("Aanwezigheid bijwerken is niet gelukt: "+error.message);return;}
-  if(isManager()) await logEvent("presence.changed",(state.user.user_metadata?.full_name||"Een beheerder")+" is nu "+(value==="home"?"thuis":"afwezig"));
   toast(value==="home"?"Je status staat op thuis.":"Je status staat op afwezig.");
   await loadHouseholdData();
 }
