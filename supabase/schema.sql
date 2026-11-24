@@ -86,9 +86,9 @@ returns boolean language sql stable security definer set search_path=public,pg_t
  select exists(select 1 from public.household_members m where m.household_id=target_household and m.user_id=auth.uid());
 $$;
 create or replace function public.can_view_household_details(target_household uuid)
-returns boolean language sql stable security definer set search_path=public,pg_temp as $
+returns boolean language sql stable security definer set search_path=public,pg_temp as $$
  select exists(select 1 from public.household_members m where m.household_id=target_household and m.user_id=auth.uid() and m.role in ('owner','admin','family'));
-$;
+$$;
 create or replace function public.can_manage_household(target_household uuid)
 returns boolean language sql stable security definer set search_path=public,pg_temp as $$
  select exists(select 1 from public.household_members m where m.household_id=target_household and m.user_id=auth.uid() and m.role in ('owner','admin'));
