@@ -1,0 +1,32 @@
+name: Validate Haven
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check application JavaScript syntax
+        run: node --check app.js
+      - name: Validate PWA manifest JSON
+        run: node -e "JSON.parse(require('node:fs').readFileSync('manifest.webmanifest', 'utf8'))"
+      - name: Check required PWA files
+        run: |
+          test -s index.html
+          test -s styles.css
+          test -s app.js
+          test -s config.js
+          test -s sw.js
+          test -s supabase/schema.sql
