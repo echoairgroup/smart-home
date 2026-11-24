@@ -490,3 +490,6 @@ end;
 $$;
 revoke all on function public.create_household(text) from public, anon;
 grant execute on function public.create_household(text) to authenticated;
+
+-- Auth trigger is internal and cannot be invoked through the client API.
+revoke all on function public.handle_new_user() from public, anon, authenticated;
