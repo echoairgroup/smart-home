@@ -11,7 +11,7 @@ if (hasBackend) {
     console.error("Haven backend import:", error);
   }
 }
-const state = {user:null,household:null,role:null,rooms:[],devices:[],automations:[],events:[],members:[],view:"overview",authMode:"login",inviteToken:"",installPrompt:null,weather:null};
+const state = {user:null,household:null,role:null,rooms:[],devices:[],automations:[],events:[],members:[],presence:[],realtimeChannel:null,realtimeHouseholdId:null,refreshTimer:null,view:"overview",authMode:"login",inviteToken:"",installPrompt:null,weather:null};
 const $ = (selector,root=document) => root.querySelector(selector);
 const $$ = selector => Array.from(document.querySelectorAll(selector));
 const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -54,6 +54,28 @@ function activityMarkup(){
   if(!state.events.length)return empty("◷","Nog geen activiteit","Nieuwe kamers, uitnodigingen en wijzigingen verschijnen later in dit overzicht.");
   return '<div class="device-list">'+state.events.map(event=>'<article class="device-row"><span class="device-glyph">◷</span><div class="device-row-main"><strong>'+esc(event.description)+'</strong><small>'+new Date(event.created_at).toLocaleString("nl-NL")+'</small></div></article>').join("")+'</div>';
 }
+function presenceLabel(value){
+  return ({home:"Thuis",away:"Afwezig",unknown:"Niet ingesteld"})[value] || "Niet ingesteld";
+}
+function presenceGlyph(value){
+  return ({home:"⌂",away:"↗",unknown:"·"})[value] || "·";
+}
+function presenceMarkup(){
+  if(!state.user || !state.household) {
+    return '<section class="panel presence-panel"><div class="panel-heading"><div><div class="eyebrow">AANWEZIGHEID</div><h2>Wie is thuis?</h2></div></div><p class="muted">Log in en open jullie huisruimte om aanwezigheidsstatussen te bekijken.</p></section>';
+  }
+  const mine = state.presence.find(item=>item.user_id===state.user.id);
+  const current = mine?.presence || "unknown";
+  const controls = '<div class="presence-controls"><button class="presence-choice '+(current==="home"?"active":"")+'" data-presence="home" type="button">⌂ Thuis</button><button class="presence-choice '+(current==="away"?"active":"")+'" data-presence="away" type="button">↗ Afwezig</button></div>';
+  const rows = state.members.map(member=>{
+    const person = state.presence.find(item=>item.user_id===member.user_id);
+    const name = member.profiles?.full_name || "Gezinslid";
+    const value = person?.presence || "unknown";
+    const label = presenceLabel(value);
+    return '<div class="presence-person"><span class="avatar">'+esc(name.slice(0,1).toUpperCase())+'</span><div class="presence-person-meta"><strong>'+esc(name)+(member.user_id===state.user.id?' <span class="you-label">JIJ</span>':'')+'</strong><small>'+esc(label)+(person?.updated_at?' · '+new Date(person.updated_at).toLocaleString("nl-NL",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"}):'')+'</small></div><span class="presence-indicator '+esc(value)+'" aria-label="'+esc(label)+'">'+presenceGlyph(value)+'</span></div>';
+  }).join("");
+  return '<section class="panel presence-panel"><div class="panel-heading"><div><div class="eyebrow">AANWEZIGHEID</div><h2>Wie is thuis?</h2></div>'+controls+'</div><div class="presence-people">'+(rows||'<p class="muted">Nog geen gezinsleden.</p>')+'</div><p class="presence-note">Handmatig bijgehouden door ieder gezinslid. Haven volgt geen GPS-locatie.</p></section>';
+}
 function familyMarkup(){
   if(!state.members.length)return empty("♧","Nog geen gezinsleden","De eigenaar verschijnt hier zodra het huishouden is geladen.");
   return '<div class="list-grid">'+state.members.map(member=>{const name=member.profiles?.full_name||"Gezinslid";const role=({owner:"Eigenaar",admin:"Beheerder",family:"Gezinslid",guest:"Gast"})[member.role]||member.role;return '<article class="member-card"><div class="member-card-top"><span class="avatar">'+esc(name.slice(0,1).toUpperCase())+'</span><span class="role-badge">'+esc(role)+'</span></div><h3>'+esc(name)+'</h3><div class="card-subtitle">Lid sinds '+new Date(member.created_at).toLocaleDateString("nl-NL")+'</div></article>';}).join("")+'</div>';
@@ -71,7 +93,7 @@ function render(){
   $("#topAction").hidden=!["rooms","devices","automations"].includes(state.view);
   let body="";
   if(state.view==="overview"){
-    body='<div class="welcome-row"><div><div class="eyebrow">JOUW THUIS, IN ÉÉN OVERZICHT</div><h1>Goedendag<span class="accent-dot">.</span></h1><p>Een rustig overzicht van wat er thuis gebeurt.</p></div><div class="home-state"><span class="state-orb"></span><div><strong>'+esc(state.household?.name||"Huisstatus")+'</strong><small>'+(state.household?"Gezinsruimte verbonden":state.user?"Nog niet ingesteld":"Nog niet verbonden")+'</small></div></div></div>'+weatherMarkup()+
+    body='<div class="welcome-row"><div><div class="eyebrow">JOUW THUIS, IN ÉÉN OVERZICHT</div><h1>Goedendag<span class="accent-dot">.</span></h1><p>Een rustig overzicht van wat er thuis gebeurt.</p></div><div class="home-state"><span class="state-orb"></span><div><strong>'+esc(state.household?.name||"Huisstatus")+'</strong><small>'+(state.household?"Gezinsruimte verbonden":state.user?"Nog niet ingesteld":"Nog niet verbonden")+'</small></div></div></div>'+weatherMarkup()+presenceMarkup()+
     '<section class="metric-grid"><article class="metric-card"><div class="metric-top"><span>APPARATEN</span><span class="metric-icon">◉</span></div><strong>'+state.devices.length+'</strong><small>Geregistreerd in je huis</small></article><article class="metric-card"><div class="metric-top"><span>KAMERS</span><span class="metric-icon">▦</span></div><strong>'+state.rooms.length+'</strong><small>Ingericht in je woning</small></article><article class="metric-card"><div class="metric-top"><span>AUTOMATISERINGEN</span><span class="metric-icon">⌁</span></div><strong>'+state.automations.length+'</strong><small>Opgeslagen conceptregels</small></article><article class="metric-card"><div class="metric-top"><span>ENERGIE VANDAAG</span><span class="metric-icon">ϟ</span></div><strong>—</strong><small>Wacht op een echte energiemeter</small></article></section>'+
     '<section class="content-grid"><article class="panel"><div class="panel-heading"><div><div class="eyebrow">RUIMTES</div><h2>In huis</h2></div><button class="text-button" data-go="rooms">Alle kamers →</button></div>'+(state.rooms.length?roomsMarkup():'<div class="empty-state compact-empty"><span class="empty-icon">⌂</span><strong>Je kamers verschijnen hier</strong><p>Maak je eerste kamer aan zodra je huisruimte is ingesteld.</p></div>')+'</article><article class="panel"><div class="panel-heading"><div><div class="eyebrow">RECENT</div><h2>Gebeurtenissen</h2></div><button class="text-button" data-go="activity">Alles bekijken →</button></div>'+(state.events.length?activityMarkup():'<div class="empty-state compact-empty"><span class="empty-icon">◷</span><strong>Nog geen gebeurtenissen</strong><p>Activiteit verschijnt hier zodra er gegevens zijn.</p></div>')+'</article></section>';
   }else if(state.view==="rooms")body=heading("INDELING","Kamers","Organiseer apparaten per ruimte in je huis.",isManager()?"Kamer toevoegen":"")+roomsMarkup();
@@ -79,7 +101,7 @@ function render(){
   else if(state.view==="automations")body=heading("REGELS & ROUTINES","Automatiseringen","Maak ALS/DAN-regels en bewaar ze als concept.",isManager()?"Regel aanmaken":"")+automationsMarkup()+'<div class="guide-panel" style="margin-top:16px"><h3>Waarom zijn regels nog niet actief?</h3><p>Een website die gesloten is kan niet betrouwbaar 24/7 voorwaarden controleren. Voor uitvoering is een apparaat nodig dat thuis continu beschikbaar is. Daarom zet Haven regels bewust niet op actief.</p></div>';
   else if(state.view==="energy")body=heading("INZICHTEN","Energie","Volg verbruik zodra een geschikte energiemeter is aangesloten.")+empty("ϟ","Nog geen energiebron gekoppeld","Er zijn nog geen energiemetingen beschikbaar. Haven verzint geen verbruikswaarden.");
   else if(state.view==="activity")body=heading("HUISGESCHIEDENIS","Activiteit","Recente wijzigingen binnen jullie huisruimte.")+activityMarkup();
-  else if(state.view==="family")body=heading("SAMEN THUIS","Gezin","Beheer wie toegang heeft tot jullie gedeelde huisruimte.",isManager()?"Gezinslid uitnodigen":"")+familyMarkup()+'<div class="guide-panel" style="margin-top:16px"><h3>Gezinsrollen</h3><p><b>Eigenaar</b> — volledige controle. <b>Beheerder</b> — huis beheren. <b>Gezinslid</b> — gegevens bekijken. <b>Gast</b> — kamers en apparaten bekijken. In deze eerste release kunnen alleen eigenaar en beheerders wijzigingen aanmaken.</p></div>';
+  else if(state.view==="family")body=heading("SAMEN THUIS","Gezin","Beheer wie toegang heeft tot jullie gedeelde huisruimte.",isManager()?"Gezinslid uitnodigen":"")+familyMarkup()+presenceMarkup()+'<div class="guide-panel" style="margin-top:16px"><h3>Gezinsrollen</h3><p><b>Eigenaar</b> — volledige controle. <b>Beheerder</b> — huis beheren. <b>Gezinslid</b> — gegevens bekijken. <b>Gast</b> — kamers en apparaten bekijken. In deze eerste release kunnen alleen eigenaar en beheerders wijzigingen aanmaken.</p></div>';
   else body=heading("PERSOONLIJK","Instellingen","Verbindingen, account en privacy.")+'<div class="content-grid"><section class="guide-panel"><h3>Backendverbinding</h3><p>'+(hasBackend?(state.user?"Je Supabase-project is verbonden en je sessie is actief.":"Supabase is ingesteld. Log in om verder te gaan."):"Vul de Supabase Project URL en anon/publishable key in config.js in. Voer daarna supabase/schema.sql uit in de SQL Editor.")+'</p><button class="button button-outline" data-action="setup-guide">Installatiestappen bekijken</button></section><section class="guide-panel"><h3>Huisruimte</h3><p>'+esc(state.household?.name||"Nog geen huisruimte")+'</p><p>Je rol: '+esc(state.role||"Niet ingelogd")+'</p>'+(state.user?'<button class="button button-outline" data-action="signout">Uitloggen</button>':'<button class="button button-primary" data-action="auth">Inloggen / account maken</button>')+'</section></div><div class="guide-panel" style="margin-top:16px"><h3>Privacy en beveiliging</h3><p>Supabase Auth beheert accounts. Databasegegevens worden beschermd met Row Level Security. De app cachet geen ingelogde gegevens voor offline gebruik. Zet nooit een service-role key of databasewachtwoord in config.js.</p></div>';
   $("#pageContent").innerHTML=body+'<footer class="page-footer"><span>HAVEN HOME</span><span>Privé voor jouw gezin · Gebouwd om uit te breiden</span></footer>';
   updateRoomSelect();updateProfile();setSetupBanner();
@@ -100,18 +122,46 @@ async function loadHouseholdData(){
     supabase.from("devices").select("*").eq("household_id",id).order("created_at"),
     supabase.from("automation_drafts").select("*").eq("household_id",id).order("created_at",{ascending:false}),
     supabase.from("activity_events").select("*").eq("household_id",id).order("created_at",{ascending:false}).limit(30),
-    supabase.from("household_members").select("user_id,role,created_at,profiles(full_name)").eq("household_id",id).order("created_at")
+    supabase.from("household_members").select("user_id,role,created_at,profiles(full_name)").eq("household_id",id).order("created_at"),
+    supabase.from("member_presence").select("household_id,user_id,presence,updated_at").eq("household_id",id).order("updated_at",{ascending:false})
   ]);
   results.forEach((result,index)=>{if(result.error)console.error("Haven data "+index,result.error.message);});
-  state.rooms=results[0].data||[];state.devices=results[1].data||[];state.automations=results[2].data||[];state.events=results[3].data||[];state.members=results[4].data||[];
-  setConnection(true,"Cloud verbonden","Privé huisruimte actief");render();
+  state.rooms=results[0].data||[];state.devices=results[1].data||[];state.automations=results[2].data||[];state.events=results[3].data||[];state.members=results[4].data||[];state.presence=results[5].data||[];
+  setConnection(true,"Cloud verbonden","Privé huisruimte actief");render();subscribeHouseholdRealtime(id);
+}
+function subscribeHouseholdRealtime(householdId){
+  if(!supabase || !householdId) return;
+  if(state.realtimeChannel && state.realtimeHouseholdId===householdId) return;
+  if(state.realtimeChannel) supabase.removeChannel(state.realtimeChannel);
+  let channel=supabase.channel("haven-household-"+householdId);
+  for(const table of ["rooms","devices","automation_drafts","activity_events","household_members","member_presence"]){
+    channel=channel.on("postgres_changes",{event:"*",schema:"public",table,filter:"household_id=eq."+householdId},()=>{
+      clearTimeout(state.refreshTimer);
+      state.refreshTimer=setTimeout(()=>loadHouseholdData(),350);
+    });
+  }
+  state.realtimeChannel=channel;
+  state.realtimeHouseholdId=householdId;
+  channel.subscribe((status)=>{
+    if(status==="CHANNEL_ERROR" || status==="TIMED_OUT") console.warn("Haven realtime status:",status);
+  });
+}
+async function setPresence(value){
+  if(!state.user || !state.household || !["home","away"].includes(value)) return;
+  const {error}=await supabase.from("member_presence").upsert({
+    household_id:state.household.id,user_id:state.user.id,presence:value,updated_at:new Date().toISOString()
+  },{onConflict:"household_id,user_id"});
+  if(error){toast("Aanwezigheid bijwerken is niet gelukt: "+error.message);return;}
+  if(isManager()) await logEvent("presence.changed",(state.user.user_metadata?.full_name||"Een beheerder")+" is nu "+(value==="home"?"thuis":"afwezig"));
+  toast(value==="home"?"Je status staat op thuis.":"Je status staat op afwezig.");
+  await loadHouseholdData();
 }
 async function refreshSession(){
   if(!supabase){setConnection(false,backendImportError?"Backend niet bereikbaar":"Niet verbonden",backendImportError?"Supabase client laden mislukt":"Supabase nog instellen");render();return;}
   const {data,error}=await supabase.auth.getSession();if(error)toast("Sessie controleren is niet gelukt.");
   state.user=data?.session?.user||null;
   if(state.user){setConnection(true,"Ingelogd","Cloud verbonden");await loadHousehold();}
-  else{state.household=null;state.role=null;state.rooms=[];state.devices=[];state.automations=[];state.events=[];state.members=[];setConnection(false,"Niet ingelogd","Meld je aan om te beginnen");render();}
+  else{state.household=null;state.role=null;state.rooms=[];state.devices=[];state.automations=[];state.events=[];state.members=[];state.presence=[];setConnection(false,"Niet ingelogd","Meld je aan om te beginnen");render();}
 }
 async function loadWeather(){
   const url="https://api.open-meteo.com/v1/forecast?latitude=52.43661&longitude=6.23282&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FAmsterdam&forecast_days=1";
@@ -143,6 +193,8 @@ $("#topAction").addEventListener("click",()=>addDialog(state.view==="rooms"?"roo
 document.addEventListener("click",event=>{
   const nav=event.target.closest("[data-view]");if(nav){state.view=nav.dataset.view;$("#sidebar").classList.remove("open");render();history.replaceState(null,"","#"+state.view);return;}
   const go=event.target.closest("[data-go]");if(go){state.view=go.dataset.go;render();return;}
+  const presenceButton=event.target.closest("[data-presence]");
+  if(presenceButton){setPresence(presenceButton.dataset.presence);return;}
   const action=event.target.closest("[data-action]");if(!action)return;
   const type=action.dataset.action;
   if(type==="room")addDialog("room");else if(type==="device")addDialog("device");else if(type==="automation")addDialog("automation");else if(type==="invite")addDialog("invite");else if(type==="page-add")addDialog(state.view==="rooms"?"room":state.view==="devices"?"device":state.view==="family"?"invite":"automation");else if(type==="signout")supabase?.auth.signOut().then(()=>refreshSession());else if(type==="auth")openModal("authDialog");else if(type==="setup-guide"){state.view="settings";render();}
@@ -159,10 +211,10 @@ $("#authForm").addEventListener("submit",event=>{
  event.preventDefault();processForm(event.currentTarget,async data=>{
   if(!supabase)throw new Error("Supabase is nog niet ingesteld.");
   const email=data.get("email"),password=data.get("password");let result;
-  if(state.authMode==="signup"){result=await supabase.auth.signUp({email,password,options:{data:{full_name:data.get("full_name")||""}}});if(result.error)throw result.error;if(!result.data.session){toast("Controleer je e-mail om je account te bevestigen.");$("#authDialog").close();return;}}
+  if(state.authMode==="signup"){result=await supabase.auth.signUp({email,password,options:{data:{full_name:data.get("full_name")||""}}});if(result.error)throw result.error;if(!result.data.session){const pendingInvite=String(data.get("invite_token")||"").trim();if(pendingInvite)sessionStorage.setItem("haven_pending_invite",pendingInvite);toast("Controleer je e-mail om je account te bevestigen. Je uitnodigingscode is op dit apparaat bewaard.");$("#authDialog").close();return;}}
   else{result=await supabase.auth.signInWithPassword({email,password});if(result.error)throw result.error;}
-  const token=String(data.get("invite_token")||"").trim();
-  if(token){const accepted=await supabase.rpc("accept_household_invite",{p_token:token});if(accepted.error)throw accepted.error;toast("Je bent aan het huishouden toegevoegd.");}
+  const token=String(data.get("invite_token")||sessionStorage.getItem("haven_pending_invite")||"").trim();
+  if(token){const accepted=await supabase.rpc("accept_household_invite",{p_token:token});if(accepted.error)throw accepted.error;sessionStorage.removeItem("haven_pending_invite");toast("Je bent aan het huishouden toegevoegd.");}
   $("#authDialog").close();await refreshSession();
  });
 });
@@ -206,4 +258,4 @@ window.addEventListener("hashchange",()=>{const next=location.hash.slice(1);if([
 if("serviceWorker" in navigator&&location.protocol!=="file:")window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(error=>console.warn("Service worker:",error)));
 updateDate();const hash=location.hash.slice(1);if(["overview","rooms","devices","automations","energy","activity","family","settings"].includes(hash))state.view=hash;
 render();loadWeather();refreshSession();setInterval(loadWeather,30*60*1000);
-if(supabase)supabase.auth.onAuthStateChange((_event,session)=>{const next=session?.user||null;if(next?.id!==state.user?.id){state.user=next;if(next)loadHousehold().catch(error=>toast(error.message));else{state.household=null;state.role=null;state.rooms=[];state.devices=[];state.automations=[];state.events=[];state.members=[];render();}}});
+if(supabase)supabase.auth.onAuthStateChange((_event,session)=>{const next=session?.user||null;if(next?.id!==state.user?.id){state.user=next;if(next)loadHousehold().catch(error=>toast(error.message));else{if(state.realtimeChannel)supabase.removeChannel(state.realtimeChannel);state.realtimeChannel=null;state.realtimeHouseholdId=null;state.household=null;state.role=null;state.rooms=[];state.devices=[];state.automations=[];state.events=[];state.members=[];state.presence=[];render();}}});
