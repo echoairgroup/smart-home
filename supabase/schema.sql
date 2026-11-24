@@ -85,6 +85,10 @@ create or replace function public.is_household_member(target_household uuid)
 returns boolean language sql stable security definer set search_path=public,pg_temp as $$
  select exists(select 1 from public.household_members m where m.household_id=target_household and m.user_id=auth.uid());
 $$;
+create or replace function public.can_view_household_details(target_household uuid)
+returns boolean language sql stable security definer set search_path=public,pg_temp as $
+ select exists(select 1 from public.household_members m where m.household_id=target_household and m.user_id=auth.uid() and m.role in ('owner','admin','family'));
+$;
 create or replace function public.can_manage_household(target_household uuid)
 returns boolean language sql stable security definer set search_path=public,pg_temp as $$
  select exists(select 1 from public.household_members m where m.household_id=target_household and m.user_id=auth.uid() and m.role in ('owner','admin'));
@@ -190,7 +194,7 @@ drop policy if exists "devices manager delete" on public.devices;
 create policy "devices manager delete" on public.devices for delete using(public.can_manage_household(household_id));
 
 drop policy if exists "automation member read" on public.automation_drafts;
-create policy "automation member read" on public.automation_drafts for select using(public.is_household_member(household_id));
+create policy "automation member read" on public.automation_drafts for select using(public.can_view_household_details(household_id));
 drop policy if exists "automation manager insert" on public.automation_drafts;
 create policy "automation manager insert" on public.automation_drafts for insert with check(public.can_manage_household(household_id) and created_by=auth.uid() and enabled=false);
 drop policy if exists "automation manager update" on public.automation_drafts;
@@ -199,12 +203,12 @@ drop policy if exists "automation manager delete" on public.automation_drafts;
 create policy "automation manager delete" on public.automation_drafts for delete using(public.can_manage_household(household_id));
 
 drop policy if exists "energy member read" on public.energy_readings;
-create policy "energy member read" on public.energy_readings for select using(public.is_household_member(household_id));
+create policy "energy member read" on public.energy_readings for select using(public.can_view_household_details(household_id));
 drop policy if exists "energy manager insert" on public.energy_readings;
 create policy "energy manager insert" on public.energy_readings for insert with check(public.can_manage_household(household_id));
 
 drop policy if exists "activity member read" on public.activity_events;
-create policy "activity member read" on public.activity_events for select using(public.is_household_member(household_id));
+create policy "activity member read" on public.activity_events for select using(public.can_view_household_details(household_id));
 drop policy if exists "activity manager insert" on public.activity_events;
 create policy "activity manager insert" on public.activity_events for insert with check(public.can_manage_household(household_id));
 
@@ -217,5 +221,6 @@ grant execute on function public.create_household_invite(uuid,text) to authentic
 revoke all on function public.accept_household_invite(text) from public;
 grant execute on function public.accept_household_invite(text) to authenticated;
 grant execute on function public.is_household_member(uuid) to authenticated;
+grant execute on function public.can_view_household_details(uuid) to authenticated;
 grant execute on function public.can_manage_household(uuid) to authenticated;
 grant execute on function public.is_household_owner(uuid) to authenticated;
