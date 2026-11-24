@@ -493,3 +493,29 @@ grant execute on function public.create_household(text) to authenticated;
 
 -- Auth trigger is internal and cannot be invoked through the client API.
 revoke all on function public.handle_new_user() from public, anon, authenticated;
+
+ 
+-- Log manual presence changes in the shared activity timeline from a private trigger.
+create or replace function private.log_member_presence_change()
+returns trigger language plpgsql security definer
+set search_path = pg_catalog, public, private, auth, pg_temp as $$
+declare member_name text;
+begin
+  if tg_op = 'INSERT' then
+    if new.presence = 'unknown' then return new; end if;
+  elsif new.presence is not distinct from old.presence then
+    return new;
+  end if;
+  select p.full_name into member_name from public.profiles p where p.id = new.user_id;
+  insert into public.activity_events(household_id,actor_id,event_type,description)
+  values(new.household_id,new.user_id,'presence.changed',
+    coalesce(nullif(trim(member_name),''),'Een gezinslid') ||
+    case new.presence when 'home' then ' is thuis' when 'away' then ' is afwezig' else ' heeft aanwezigheid niet ingesteld' end);
+  return new;
+end;
+$$;
+revoke all on function private.log_member_presence_change() from public, anon, authenticated;
+drop trigger if exists on_member_presence_activity on public.member_presence;
+create trigger on_member_presence_activity
+after insert or update of presence on public.member_presence
+for each row execute function private.log_member_presence_change();
