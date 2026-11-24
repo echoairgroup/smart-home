@@ -441,3 +441,23 @@ begin
   end loop;
  end if;
 end $$;
+
+
+-- Profile policies use a scalar subquery for auth.uid() so it is evaluated once per statement.
+drop policy if exists "profiles readable by household" on public.profiles;
+create policy "profiles readable by household" on public.profiles
+for select to authenticated
+using (
+  id = (select auth.uid())
+  or exists (
+    select 1
+    from public.household_members mine
+    join public.household_members theirs on theirs.household_id = mine.household_id
+    where mine.user_id = (select auth.uid()) and theirs.user_id = profiles.id
+  )
+);
+drop policy if exists "profiles update self" on public.profiles;
+create policy "profiles update self" on public.profiles
+for update to authenticated
+using (id = (select auth.uid()))
+with check (id = (select auth.uid()));
