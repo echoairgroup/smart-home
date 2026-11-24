@@ -37,7 +37,7 @@ Open http://localhost:8080. After configuring Supabase, create an account and th
 Deploy this repository as a static site on a free HTTPS hosting plan. Set the repository root as the site root; there is no build command. The service worker and PWA install prompt require HTTPS (localhost is also supported).
 
 ## Privacy and data
-Household data is scoped by household_id. SQL policies ensure users can only read data for households they belong to. Owner/admin manage rooms, device inventory and automation drafts. Family and Guest can read household information. Invitation tokens are stored hashed and expire after seven days. Weather uses fixed public coordinates for Heino; no personal location is collected.
+Household data is scoped by household_id. SQL policies ensure users can only read data for households they belong to. Owner/admin manage rooms, device inventory and automation drafts. Only the Owner may change roles. Family can read household details; Guest can read rooms and devices. Members may update only their own presence; owners/admins can correct a member status. Presence is manual and no GPS/background tracking is used. Invitation tokens are stored hashed and expire after seven days. Weather uses fixed public coordinates for Heino; no personal location is collected.
 
 ## Development
 Plain HTML, CSS and modern browser JavaScript; no build tool or backend server process is required. Supabase JS is loaded from the esm.sh CDN only after configuration. Weather comes directly from Open-Meteo. The service worker caches only the app shell, not private household data.
