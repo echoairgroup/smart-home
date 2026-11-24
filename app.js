@@ -1,7 +1,16 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const config = window.SMART_HOME_CONFIG || {};
 const hasBackend = Boolean(config.supabaseUrl && config.supabaseAnonKey);
-const supabase = hasBackend ? createClient(config.supabaseUrl, config.supabaseAnonKey, { auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true} }) : null;
+let supabase = null;
+let backendImportError = "";
+if (hasBackend) {
+  try {
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, { auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true} });
+  } catch (error) {
+    backendImportError = error?.message || "Supabase client kon niet worden geladen.";
+    console.error("Haven backend import:", error);
+  }
+}
 const state = {user:null,household:null,role:null,rooms:[],devices:[],automations:[],events:[],members:[],view:"overview",authMode:"login",inviteToken:"",installPrompt:null,weather:null};
 const $ = (selector,root=document) => root.querySelector(selector);
 const $$ = selector => Array.from(document.querySelectorAll(selector));
@@ -19,7 +28,7 @@ function updateProfile(){
 }
 function setSetupBanner(){
   const banner=$("#setupBanner");
-  if(!hasBackend){banner.hidden=false;banner.querySelector("strong").textContent="Cloud-backend nog niet ingesteld";banner.querySelector("p").textContent="Het weer werkt al. Stel je gratis Supabase-project in voor gezinsaccounts en huisgegevens.";$("#setupButton").textContent="Installatie bekijken →";}
+  if(!hasBackend || backendImportError){banner.hidden=false;banner.querySelector("strong").textContent=backendImportError?"Supabase kon niet worden geladen":"Cloud-backend nog niet ingesteld";banner.querySelector("p").textContent=backendImportError?"Controleer de internetverbinding en probeer opnieuw.":"Het weer werkt al. Stel je gratis Supabase-project in voor gezinsaccounts en huisgegevens." ;$("#setupButton").textContent="Installatie bekijken →";}
   else if(!state.user){banner.hidden=false;banner.querySelector("strong").textContent="Log in om jullie huis te openen";banner.querySelector("p").textContent="Je gezinsgegevens zijn privé en laden pas nadat je bent ingelogd.";}
   else if(!state.household){banner.hidden=false;banner.querySelector("strong").textContent="Maak jullie huisruimte aan";banner.querySelector("p").textContent="Je account is verbonden. Maak een huishouden of gebruik een gezinsuitnodiging.";}
   else banner.hidden=true;
@@ -98,7 +107,7 @@ async function loadHouseholdData(){
   setConnection(true,"Cloud verbonden","Privé huisruimte actief");render();
 }
 async function refreshSession(){
-  if(!supabase){setConnection(false,"Niet verbonden","Supabase nog instellen");render();return;}
+  if(!supabase){setConnection(false,backendImportError?"Backend niet bereikbaar":"Niet verbonden",backendImportError?"Supabase client laden mislukt":"Supabase nog instellen");render();return;}
   const {data,error}=await supabase.auth.getSession();if(error)toast("Sessie controleren is niet gelukt.");
   state.user=data?.session?.user||null;
   if(state.user){setConnection(true,"Ingelogd","Cloud verbonden");await loadHousehold();}
