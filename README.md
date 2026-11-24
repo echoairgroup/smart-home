@@ -26,6 +26,14 @@ Haven is a private, installable smart-home dashboard for a household. This first
 
 The anon/publishable key is designed for browser use. Never put a service_role key, database password or any other secret in this repository. Keep Row Level Security enabled.
 
+## Supabase Auth redirect setup
+
+In **Supabase Dashboard → Authentication → URL Configuration**, set the Site URL to:
+
+    https://echoairgroup.github.io/smart-home/
+
+Add the same URL to the Redirect URLs allow-list. The app sends email confirmation links back to the current Haven deployment path. When you later deploy to another domain, add that domain and path to the allow-list as well.
+
 ## 2. Run locally
 Serve this folder over HTTP (not by opening index.html as a file). For example:
 
