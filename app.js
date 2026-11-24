@@ -258,7 +258,7 @@ $("#authForm").addEventListener("submit",event=>{
  event.preventDefault();processForm(event.currentTarget,async data=>{
   if(!supabase)throw new Error("Supabase is nog niet ingesteld.");
   const email=data.get("email"),password=data.get("password");let result;
-  if(state.authMode==="signup"){result=await supabase.auth.signUp({email,password,options:{data:{full_name:data.get("full_name")||""}}});if(result.error)throw result.error;if(!result.data.session){const pendingInvite=String(data.get("invite_token")||"").trim();if(pendingInvite)sessionStorage.setItem("haven_pending_invite",pendingInvite);toast("Controleer je e-mail om je account te bevestigen. Je uitnodigingscode is op dit apparaat bewaard.");$("#authDialog").close();return;}}
+  if(state.authMode==="signup"){result=await supabase.auth.signUp({email,password,options:{data:{full_name:data.get("full_name")||""},emailRedirectTo:new URL("./",window.location.href).toString()}});if(result.error)throw result.error;if(!result.data.session){const pendingInvite=String(data.get("invite_token")||"").trim();if(pendingInvite)sessionStorage.setItem("haven_pending_invite",pendingInvite);toast("Controleer je e-mail om je account te bevestigen. Je uitnodigingscode is op dit apparaat bewaard.");$("#authDialog").close();return;}}
   else{result=await supabase.auth.signInWithPassword({email,password});if(result.error)throw result.error;}
   const token=String(data.get("invite_token")||sessionStorage.getItem("haven_pending_invite")||"").trim();
   if(token){const accepted=await supabase.rpc("accept_household_invite",{p_token:token});if(accepted.error)throw accepted.error;sessionStorage.removeItem("haven_pending_invite");toast("Je bent aan het huishouden toegevoegd.");}
