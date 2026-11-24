@@ -40,15 +40,15 @@ function heading(eyebrow,title,description,action){return '<div class="page-head
 function empty(icon,title,description,button,action){return '<div class="empty-state"><span class="empty-icon">'+icon+'</span><strong>'+title+'</strong><p>'+description+'</p>'+(button?'<button class="button button-outline" style="margin-top:15px" data-action="'+action+'">'+button+'</button>':"")+'</div>';}
 function roomsMarkup(){
   if(!state.rooms.length)return empty("⌂","Nog geen kamers","Maak kamers aan om apparaten straks per ruimte te groeperen.",isManager()?"Eerste kamer toevoegen":"","room");
-  return '<div class="list-grid">'+state.rooms.map(room=>'<article class="room-card"><div class="room-card-top"><span class="room-glyph">'+roomIcon(room.icon)+'</span><span class="pill">'+state.devices.filter(d=>d.room_id===room.id).length+' apparaten</span></div><h3>'+esc(room.name)+'</h3><div class="card-subtitle">Ruimte in jullie huis</div></article>').join("")+'</div>';
+  return '<div class="list-grid">'+state.rooms.map(room=>'<article class="room-card"><div class="room-card-top"><span class="room-glyph">'+roomIcon(room.icon)+'</span><span class="pill">'+state.devices.filter(d=>d.room_id===room.id).length+' apparaten</span></div><h3>'+esc(room.name)+'</h3><div class="card-subtitle">Ruimte in jullie huis</div>'+(isManager()?'<div class="card-actions"><button class="delete-button" data-delete="rooms" data-id="'+esc(room.id)+'" type="button">Verwijderen</button></div>':'')+'</article>').join("")+'</div>';
 }
 function devicesMarkup(){
   if(!state.devices.length)return empty("◉","Nog geen apparaten geregistreerd","Voeg apparaten toe aan je inventaris. Ze worden niet als verbonden getoond zonder echte integratie.",isManager()?"Apparaat registreren":"","device");
-  return '<div class="device-list">'+state.devices.map(device=>{const room=state.rooms.find(r=>r.id===device.room_id);return '<article class="device-row"><span class="device-glyph">'+deviceIcon(device.kind)+'</span><div class="device-row-main"><strong>'+esc(device.name)+'</strong><small>'+esc(kindLabel(device.kind))+' · '+esc(room?.name||"Geen kamer")+(device.manufacturer?" · "+esc(device.manufacturer):"")+'</small></div><span class="pill '+(device.connection_state==="connected"?"ok":"pending")+'">'+(device.connection_state==="connected"?"Verbonden":"Niet gekoppeld")+'</span></article>';}).join("")+'</div>';
+  return '<div class="device-list">'+state.devices.map(device=>{const room=state.rooms.find(r=>r.id===device.room_id);return '<article class="device-row"><span class="device-glyph">'+deviceIcon(device.kind)+'</span><div class="device-row-main"><strong>'+esc(device.name)+'</strong><small>'+esc(kindLabel(device.kind))+' · '+esc(room?.name||"Geen kamer")+(device.manufacturer?" · "+esc(device.manufacturer):"")+'</small></div><span class="pill '+(device.connection_state==="connected"?"ok":"pending")+'">'+(device.connection_state==="connected"?"Verbonden":"Niet gekoppeld")+'</span>'+(isManager()?'<button class="delete-button" data-delete="devices" data-id="'+esc(device.id)+'" type="button">Verwijderen</button>':'')+'</article>';}).join("")+'</div>';
 }
 function automationsMarkup(){
   if(!state.automations.length)return empty("⌁","Nog geen automatiseringen","Leg alvast vast wat er moet gebeuren. Regels worden als concept bewaard; ze voeren nog niets automatisch uit.",isManager()?"Regel aanmaken":"","automation");
-  return '<div class="automation-list">'+state.automations.map(rule=>'<article class="automation-card"><div class="room-card-top"><span class="pill pending">Concept · niet actief</span><span class="card-subtitle">'+new Date(rule.created_at).toLocaleDateString("nl-NL")+'</span></div><h3>'+esc(rule.name)+'</h3><div class="rule-line"><b>ALS</b>'+esc(rule.trigger_description)+'</div><div class="rule-line"><b>DAN</b>'+esc(rule.action_description)+'</div></article>').join("")+'</div>';
+  return '<div class="automation-list">'+state.automations.map(rule=>'<article class="automation-card"><div class="room-card-top"><span class="pill pending">Concept · niet actief</span><span class="card-subtitle">'+new Date(rule.created_at).toLocaleDateString("nl-NL")+'</span></div><h3>'+esc(rule.name)+'</h3><div class="rule-line"><b>ALS</b>'+esc(rule.trigger_description)+'</div><div class="rule-line"><b>DAN</b>'+esc(rule.action_description)+'</div>'+(isManager()?'<div class="card-actions"><button class="delete-button" data-delete="automation_drafts" data-id="'+esc(rule.id)+'" type="button">Verwijderen</button></div>':'')+'</article>').join("")+'</div>';
 }
 function activityMarkup(){
   if(!state.events.length)return empty("◷","Nog geen activiteit","Nieuwe kamers, uitnodigingen en wijzigingen verschijnen later in dit overzicht.");
@@ -78,7 +78,7 @@ function presenceMarkup(){
 }
 function familyMarkup(){
   if(!state.members.length)return empty("♧","Nog geen gezinsleden","De eigenaar verschijnt hier zodra het huishouden is geladen.");
-  return '<div class="list-grid">'+state.members.map(member=>{const name=member.profiles?.full_name||"Gezinslid";const role=({owner:"Eigenaar",admin:"Beheerder",family:"Gezinslid",guest:"Gast"})[member.role]||member.role;return '<article class="member-card"><div class="member-card-top"><span class="avatar">'+esc(name.slice(0,1).toUpperCase())+'</span><span class="role-badge">'+esc(role)+'</span></div><h3>'+esc(name)+'</h3><div class="card-subtitle">Lid sinds '+new Date(member.created_at).toLocaleDateString("nl-NL")+'</div></article>';}).join("")+'</div>';
+  return '<div class="list-grid">'+state.members.map(member=>{const name=member.profiles?.full_name||"Gezinslid";const role=({owner:"Eigenaar",admin:"Beheerder",family:"Gezinslid",guest:"Gast"})[member.role]||member.role;return '<article class="member-card"><div class="member-card-top"><span class="avatar">'+esc(name.slice(0,1).toUpperCase())+'</span><span class="role-badge">'+esc(role)+'</span></div><h3>'+esc(name)+'</h3><div class="card-subtitle">Lid sinds '+new Date(member.created_at).toLocaleDateString("nl-NL")+'</div>'+(state.role==="owner"&&member.role!=="owner"?'<label class="role-editor">Toegangsrol<select data-role-user="'+esc(member.user_id)+'"><option value="admin" '+(member.role==="admin"?"selected":"")+'>Beheerder</option><option value="family" '+(member.role==="family"?"selected":"")+'>Gezinslid</option><option value="guest" '+(member.role==="guest"?"selected":"")+'>Gast</option></select></label>':'')+'</article>';}).join("")+'</div>';
 }
 function weatherMarkup(){
  const w=state.weather;
@@ -175,6 +175,30 @@ async function loadWeather(){
 function weatherCode(code,isDay){
   if(code===0)return{label:"Onbewolkt",icon:isDay?"☀":"☾"};if(code===1)return{label:"Overwegend helder",icon:"🌤"};if(code===2)return{label:"Half bewolkt",icon:"⛅"};if(code===3)return{label:"Bewolkt",icon:"☁"};if([45,48].includes(code))return{label:"Mistig",icon:"〰"};if([51,53,55,56,57].includes(code))return{label:"Motregen",icon:"🌦"};if([61,63,65,66,67,80,81,82].includes(code))return{label:"Regen",icon:"🌧"};if([71,73,75,77,85,86].includes(code))return{label:"Sneeuw",icon:"❄"};if([95,96,99].includes(code))return{label:"Onweer",icon:"⛈"};return{label:"Wisselend weer",icon:"☁"};
 }
+
+async function deleteHouseholdRecord(table, recordId){
+  if(!canManage()) return;
+  const names={rooms:"kamer",devices:"apparaat",automation_drafts:"automatisering"};
+  const label=names[table];
+  if(!label || !recordId) return;
+  if(!window.confirm("Weet je zeker dat je dit "+label+" wilt verwijderen?")) return;
+  const {error}=await supabase.from(table).delete().eq("id",recordId).eq("household_id",state.household.id);
+  if(error){toast("Verwijderen is niet gelukt: "+error.message);return;}
+  await logEvent(table+".deleted",label.charAt(0).toUpperCase()+label.slice(1)+" verwijderd");
+  toast(label.charAt(0).toUpperCase()+label.slice(1)+" verwijderd.");
+  await loadHouseholdData();
+}
+async function changeMemberRole(userId,role){
+  if(state.role!=="owner" || !["admin","family","guest"].includes(role)) return;
+  const member=state.members.find(item=>item.user_id===userId);
+  if(!member || member.role===role) return;
+  const {error}=await supabase.from("household_members").update({role}).eq("household_id",state.household.id).eq("user_id",userId);
+  if(error){toast("Rol wijzigen is niet gelukt: "+error.message);await loadHouseholdData();return;}
+  await logEvent("member.role_changed","Toegangsrol gewijzigd naar "+({admin:"beheerder",family:"gezinslid",guest:"gast"}[role]));
+  toast("Toegangsrol bijgewerkt.");
+  await loadHouseholdData();
+}
+
 function canManage(){if(!state.user){openModal("authDialog");return false;}if(!state.household){toast("Maak eerst een huisruimte aan.");return false;}if(!isManager()){toast("Alleen de eigenaar of beheerder kan dit aanpassen.");return false;}return true;}
 function addDialog(type){if(!canManage())return;const id={room:"roomDialog",device:"deviceDialog",automation:"automationDialog",invite:"inviteDialog"}[type];if(id)openModal(id);}
 async function processForm(form,callback){
@@ -190,7 +214,13 @@ $("#setupButton").addEventListener("click",()=>{if(hasBackend&&!state.user)openM
 $("#menuButton").addEventListener("click",()=>$("#sidebar").classList.toggle("open"));
 $("#installButton").addEventListener("click",async()=>{if(!state.installPrompt)return;state.installPrompt.prompt();await state.installPrompt.userChoice;state.installPrompt=null;$("#installButton").hidden=true;});
 $("#topAction").addEventListener("click",()=>addDialog(state.view==="rooms"?"room":state.view==="devices"?"device":"automation"));
+document.addEventListener("change",event=>{
+  const roleSelect=event.target.closest("[data-role-user]");
+  if(roleSelect) changeMemberRole(roleSelect.dataset.roleUser,roleSelect.value);
+});
 document.addEventListener("click",event=>{
+  const deleteButton=event.target.closest("[data-delete]");
+  if(deleteButton){deleteHouseholdRecord(deleteButton.dataset.delete,deleteButton.dataset.id);return;}
   const nav=event.target.closest("[data-view]");if(nav){state.view=nav.dataset.view;$("#sidebar").classList.remove("open");render();history.replaceState(null,"","#"+state.view);return;}
   const go=event.target.closest("[data-go]");if(go){state.view=go.dataset.go;render();return;}
   const presenceButton=event.target.closest("[data-presence]");
