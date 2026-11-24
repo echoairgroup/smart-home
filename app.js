@@ -4,7 +4,7 @@ let supabase = null;
 let backendImportError = "";
 if (hasBackend) {
   try {
-    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+    const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.119.2");
     supabase = createClient(config.supabaseUrl, config.supabaseAnonKey, { auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true} });
   } catch (error) {
     backendImportError = error?.message || "Supabase client kon niet worden geladen.";
