@@ -461,3 +461,32 @@ create policy "profiles update self" on public.profiles
 for update to authenticated
 using (id = (select auth.uid()))
 with check (id = (select auth.uid()));
+
+ 
+-- Pre-register the known Samsung television when the first household is created.
+create or replace function public.create_household(p_name text)
+returns uuid language plpgsql security definer
+set search_path = pg_catalog, public, auth, private, pg_temp
+as $$
+declare new_id uuid;
+begin
+  if (select auth.uid()) is null then raise exception 'Je moet ingelogd zijn.'; end if;
+  if exists(select 1 from public.household_members where user_id=(select auth.uid()) and role='owner') then
+    raise exception 'Je account heeft al een huishouden aangemaakt.';
+  end if;
+  if p_name is null or char_length(trim(p_name)) not between 1 and 60 then
+    raise exception 'Vul een naam van 1 tot 60 tekens in.';
+  end if;
+  insert into public.households(name,created_by)
+    values(trim(p_name),(select auth.uid())) returning id into new_id;
+  insert into public.household_members(household_id,user_id,role)
+    values(new_id,(select auth.uid()),'owner');
+  insert into public.devices(household_id,room_id,name,kind,manufacturer,integration,connection_state)
+    values(new_id,null,'Samsung TV','tv','Samsung QE43Q67DAUXXN','manual','not_connected');
+  insert into public.activity_events(household_id,actor_id,event_type,description)
+    values(new_id,(select auth.uid()),'household.created','Huishouden aangemaakt');
+  return new_id;
+end;
+$$;
+revoke all on function public.create_household(text) from public, anon;
+grant execute on function public.create_household(text) to authenticated;
